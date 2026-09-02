@@ -127,11 +127,17 @@ vanilla JS + Chart.js bir arayüz açılır:
   (kategori → öncelik → RAG araması → ekip ataması) küçük bir zaman çizelgesi
   animasyonuyla, bulunan benzer ticket'lar benzerlik yüzdesiyle kart listesi
   halinde gösterilir. Sonucun altında, backend'deki `ticket_history` tablosundan
-  gelen (en yeni üstte) bir **ticket geçmişi tablosu** listelenir.
+  gelen (en yeni üstte) bir **ticket geçmişi tablosu** listelenir. Sonuç
+  kartındaki "Kategori yanlış mı?" kutusundan doğru kategori seçilip
+  kaydedilebilir (`PATCH /tickets/history/{id}`); bu düzeltme
+  `corrected_category` olarak geçmiş tablosuna yazılır (model yeniden
+  eğitilmez, ileride kullanılabilecek bir veri olarak saklanır).
 - **Dashboard** sekmesi: `GET /tickets/history`'den gelen gerçek veriye göre
   kategori dağılımı (pasta grafik) ve öncelik dağılımı (bar grafik) — Chart.js
   ile. Veri artık `localStorage` değil, backend'deki SQLite tablosu; yani tüm
-  kullanıcılar/oturumlar arasında paylaşılır.
+  kullanıcılar/oturumlar arasında paylaşılır. Ayrıca `GET /tickets/alerts`
+  üzerinden, son 7 günde bir kategoriden 3'ten fazla ticket geldiyse basit
+  bir "tekrarlayan sorun" uyarı banner'ı gösterilir.
 
 ### Örnek istek
 

@@ -1,5 +1,6 @@
 const API_URL = "/ticket";
 const HISTORY_URL = "/tickets/history";
+const ALERTS_URL = "/tickets/alerts";
 
 const CATEGORY_LABELS = {
   "donanım": "Donanım",
@@ -258,6 +259,33 @@ async function fetchHistory() {
   return response.json();
 }
 
+async function fetchAlerts() {
+  const response = await fetch(ALERTS_URL);
+  if (!response.ok) throw new Error("Uyarılar alınamadı");
+  return response.json();
+}
+
+function renderAlerts(alerts) {
+  const container = document.getElementById("alerts-container");
+
+  if (!alerts || alerts.length === 0) {
+    container.hidden = true;
+    container.innerHTML = "";
+    return;
+  }
+
+  container.hidden = false;
+  container.innerHTML = alerts
+    .map(
+      (alert) => `
+        <div class="alert-banner">
+          ⚠ Son ${alert.days} günde ${alert.count} '${categoryLabel(alert.category)}' sorunu — tekrarlayan bir örüntü olabilir.
+        </div>
+      `
+    )
+    .join("");
+}
+
 function truncate(text, maxLen) {
   if (!text) return "";
   return text.length > maxLen ? `${text.slice(0, maxLen)}…` : text;
@@ -317,7 +345,9 @@ function chartBaseOptions(title) {
 
 async function refreshDashboard() {
   try {
-    renderDashboardCharts(await fetchHistory());
+    const [history, alerts] = await Promise.all([fetchHistory(), fetchAlerts()]);
+    renderDashboardCharts(history);
+    renderAlerts(alerts);
   } catch (err) {
     console.error(err);
   }

@@ -105,3 +105,29 @@ def test_correct_ticket_history_404_for_missing_id(make_client):
     response = client.patch("/tickets/history/999", json={"corrected_category": "ağ"})
 
     assert response.status_code == 404
+
+
+def test_recurring_alerts_empty_below_threshold(make_client):
+    client = make_client(FAKE_RESULT)
+    for _ in range(3):
+        client.post("/ticket", json={"text": "Excel dosyası açılırken çöküyor"})
+
+    response = client.get("/tickets/alerts")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_recurring_alerts_triggers_above_threshold(make_client):
+    client = make_client(FAKE_RESULT)
+    for _ in range(4):
+        client.post("/ticket", json={"text": "Excel dosyası açılırken çöküyor"})
+
+    response = client.get("/tickets/alerts")
+
+    assert response.status_code == 200
+    alerts = response.json()
+    assert len(alerts) == 1
+    assert alerts[0]["category"] == FAKE_RESULT["category"]
+    assert alerts[0]["count"] == 4
+    assert alerts[0]["threshold"] == 3

@@ -57,3 +57,10 @@ class CorrectionRequest(BaseModel):
         if value not in CATEGORIES:
             raise ValueError(f"Geçersiz kategori: {value!r}. Beklenen değerler: {CATEGORIES}")
         return value
+
+
+class RecurringAlert(BaseModel):
+    category: str
+    count: int
+    days: int
+    threshold: int

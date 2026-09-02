@@ -8,13 +8,20 @@ from fastapi.staticfiles import StaticFiles
 from app.agent.graph import build_graph
 from app.config import SQLITE_DB_PATH
 from app.db.database import (
+    fetch_recurring_alerts,
     fetch_ticket_history,
     init_db,
     insert_ticket_history,
     seed_if_empty,
     update_ticket_correction,
 )
-from app.schemas import CorrectionRequest, TicketHistoryItem, TicketRequest, TicketResponse
+from app.schemas import (
+    CorrectionRequest,
+    RecurringAlert,
+    TicketHistoryItem,
+    TicketRequest,
+    TicketResponse,
+)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -91,3 +98,8 @@ def correct_ticket_history(
     if updated is None:
         raise HTTPException(status_code=404, detail="Ticket geçmişte bulunamadı")
     return updated
+
+
+@app.get("/tickets/alerts", response_model=list[RecurringAlert])
+def get_recurring_alerts(db_path: str = Depends(get_db_path)) -> list[dict]:
+    return fetch_recurring_alerts(db_path=db_path)

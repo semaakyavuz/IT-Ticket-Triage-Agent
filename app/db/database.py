@@ -117,3 +117,28 @@ def update_ticket_correction(
             "SELECT * FROM ticket_history WHERE id = ?", (ticket_id,)
         ).fetchone()
         return dict(row)
+
+
+def fetch_recurring_alerts(
+    days: int = 7, threshold: int = 3, db_path: str = SQLITE_DB_PATH
+) -> list[dict]:
+    """Son `days` gün içinde bir kategoriden `threshold`'dan fazla ticket geldiyse
+    o kategoriyi döner. Basit bir kategori bazlı sayım sorgusu; karmaşık bir
+    model gerektirmiyor."""
+    with get_connection(db_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT category, COUNT(*) AS count
+            FROM ticket_history
+            WHERE category IS NOT NULL
+              AND created_at >= datetime('now', ?)
+            GROUP BY category
+            HAVING COUNT(*) > ?
+            ORDER BY count DESC
+            """,
+            (f"-{days} days", threshold),
+        ).fetchall()
+        return [
+            {"category": row["category"], "count": row["count"], "days": days, "threshold": threshold}
+            for row in rows
+        ]

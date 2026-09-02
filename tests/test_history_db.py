@@ -1,4 +1,5 @@
 from app.db.database import (
+    fetch_recurring_alerts,
     fetch_ticket_history,
     init_db,
     insert_ticket_history,
@@ -60,3 +61,37 @@ def test_update_ticket_correction_returns_none_for_missing_id(tmp_path):
     db_path = _db(tmp_path)
 
     assert update_ticket_correction(999, "ağ", db_path=db_path) is None
+
+
+def test_fetch_recurring_alerts_does_not_trigger_at_threshold(tmp_path):
+    db_path = _db(tmp_path)
+    for _ in range(3):
+        insert_ticket_history("ağ sorunu", "ağ", "orta", "Network Operasyon Ekibi", db_path=db_path)
+
+    assert fetch_recurring_alerts(db_path=db_path) == []
+
+
+def test_fetch_recurring_alerts_triggers_above_threshold(tmp_path):
+    db_path = _db(tmp_path)
+    for _ in range(4):
+        insert_ticket_history("ağ sorunu", "ağ", "orta", "Network Operasyon Ekibi", db_path=db_path)
+
+    alerts = fetch_recurring_alerts(db_path=db_path)
+
+    assert len(alerts) == 1
+    assert alerts[0]["category"] == "ağ"
+    assert alerts[0]["count"] == 4
+    assert alerts[0]["days"] == 7
+    assert alerts[0]["threshold"] == 3
+
+
+def test_fetch_recurring_alerts_only_flags_categories_over_threshold(tmp_path):
+    db_path = _db(tmp_path)
+    for _ in range(4):
+        insert_ticket_history("ağ sorunu", "ağ", "orta", "Network Operasyon Ekibi", db_path=db_path)
+    for _ in range(2):
+        insert_ticket_history("donanım sorunu", "donanım", "düşük", "Donanım Destek Ekibi", db_path=db_path)
+
+    alerts = fetch_recurring_alerts(db_path=db_path)
+
+    assert [a["category"] for a in alerts] == ["ağ"]

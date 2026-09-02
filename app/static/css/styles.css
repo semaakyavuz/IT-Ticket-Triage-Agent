@@ -580,6 +580,23 @@ button[type="submit"]:disabled {
   gap: 0.75rem;
 }
 
+.alerts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.alert-banner {
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-left: 3px solid var(--warning);
+  color: #fde68a;
+  font-size: 0.85rem;
+}
+
 .charts-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
