@@ -23,15 +23,48 @@ IT sorununu incelemek için şu adımları SIRAYLA uygula:
    öner. Yeterince benzer bir ticket bulunamadıysa `assign_team` tool'unu belirlediğin
    kategoriyle çağırarak doğru ekibe yönlendir.
 
-Gerekli tüm tool çağrılarını tamamladıktan sonra, kullanıcıya tek bir kısa paragrafla
-(Türkçe) ya önerdiğin çözümü ya da yönlendirildiği ekibi bildir. Başka açıklama ekleme.
+Gerekli tüm tool çağrılarını tamamladıktan sonra kısa bir onay mesajı yaz (bu mesaj
+kullanıcıya gösterilmeyecek, sadece adımların tamamlandığını belirtir).
 """
+
+# Ana ReAct döngüsü tool çağırmaktan sorumlu; son kullanıcıya gösterilecek cümle
+# kasıtlı olarak AYRI ve basit bir çağrıyla üretiliyor (bkz. _compose_solution_text).
+# Küçük, local bir modelin (llama3.2) çok adımlı tool-calling + dil/format
+# kısıtlarını AYNI ANDA tutması güvenilir çalışmadı (İngilizce girdi Türkçe yerine
+# İngilizce/liste formatlı yanıtla sonuçlanabiliyordu); tek amaçlı, kısa bir prompt
+# bu modelde belirgin şekilde daha tutarlı sonuç verdi.
+COMPOSE_PROMPT_TEMPLATE = """Sen bir IT destek asistanısın. Aşağıdaki bilgilere dayanarak
+kullanıcıya söyleyeceğin TEK bir Türkçe cümle yaz. SADECE o cümleyi yaz; liste,
+madde işareti, başlık veya ek açıklama KULLANMA.
+
+Kategori: {category}
+Öncelik: {priority}
+Geçmişte bulunan en benzer çözüm: {best_solution}
+Yönlendirilen ekip: {assigned_team}
+
+Eğer geçmişte benzer bir çözüm varsa ona dayanarak somut bir çözüm öner; yoksa
+sadece hangi ekibe yönlendirildiğini tek cümleyle belirt.
+
+ÇOK ÖNEMLİ: Cümlenin TAMAMI Türkçe olmalı. "needed", "should", "issue",
+"please" gibi TEK BİR İngilizce kelime bile kullanma; İngilizce bir kelime
+aklına gelirse yerine Türkçe karşılığını yaz (örn. "gerekiyor", "öneriliyor")."""
 
 
 def _get_llm() -> ChatOllama:
     return ChatOllama(
         model=OLLAMA_CHAT_MODEL, base_url=OLLAMA_BASE_URL, temperature=0
     ).bind_tools(TOOLS)
+
+
+def _get_plain_llm() -> ChatOllama:
+    """Son cümleyi üreten, tool bağlı OLMAYAN model.
+
+    Aynı (tool-bound) model kompozisyon için de kullanıldığında, model bir
+    metin yazmak yerine tekrar bir tool çağırmayı seçebiliyordu (boş `content`
+    ile sonuçlanan bir AIMessage). Tool'ları hiç görmeyen ayrı bir örnek bu
+    riski ortadan kaldırıyor.
+    """
+    return ChatOllama(model=OLLAMA_CHAT_MODEL, base_url=OLLAMA_BASE_URL, temperature=0)
 
 
 def _agent_node(state: TicketState, llm: ChatOllama) -> dict:
@@ -61,7 +94,25 @@ def _extract_tool_result(messages: list, tool_name: str) -> str | None:
     return None
 
 
-def _finalize_node(state: TicketState) -> dict:
+def _compose_solution_text(
+    llm: ChatOllama,
+    category: str | None,
+    priority: str | None,
+    similar_tickets: list[dict],
+    assigned_team: str | None,
+) -> str:
+    best_solution = similar_tickets[0]["solution"] if similar_tickets else "yok"
+    prompt = COMPOSE_PROMPT_TEMPLATE.format(
+        category=category or "belirsiz",
+        priority=priority or "belirsiz",
+        best_solution=best_solution,
+        assigned_team=assigned_team or "belirtilmedi",
+    )
+    response = llm.invoke([HumanMessage(content=prompt)])
+    return response.content.strip()
+
+
+def _finalize_node(state: TicketState, llm: ChatOllama) -> dict:
     messages = state["messages"]
 
     category = None
@@ -80,11 +131,7 @@ def _finalize_node(state: TicketState) -> dict:
     except json.JSONDecodeError:
         similar_tickets = []
 
-    final_ai_message = next(
-        (m for m in reversed(messages) if isinstance(m, AIMessage) and m.content),
-        None,
-    )
-    solution = final_ai_message.content.strip() if final_ai_message else None
+    solution = _compose_solution_text(llm, category, priority, similar_tickets, assigned_team)
 
     return {
         "category": category,
@@ -95,18 +142,22 @@ def _finalize_node(state: TicketState) -> dict:
     }
 
 
-def build_graph(llm: ChatOllama | None = None):
+def build_graph(llm: ChatOllama | None = None, compose_llm: ChatOllama | None = None):
     """LangGraph agent grafiğini oluşturur ve derler.
 
-    `llm` parametresi testlerde sahte bir modelle değiştirmek için opsiyoneldir;
-    verilmezse gerçek Ollama modeli kullanılır.
+    `llm` tool-calling döngüsünde kullanılır; `compose_llm` son kullanıcıya
+    gösterilecek cümleyi üretir (gerçek kullanımda bilerek tool bağlı olmayan
+    ayrı bir model). İkisi de testlerde sahte bir modelle değiştirmek için
+    opsiyoneldir; `compose_llm` verilmezse ve `llm` verilmişse (örn. testte
+    tek bir sahte model kullanmak için) `llm` ile aynı nesne kullanılır.
     """
-    llm = llm or _get_llm()
+    react_llm = llm or _get_llm()
+    finalize_llm = compose_llm or llm or _get_plain_llm()
 
     graph = StateGraph(TicketState)
-    graph.add_node("agent", lambda state: _agent_node(state, llm))
+    graph.add_node("agent", lambda state: _agent_node(state, react_llm))
     graph.add_node("tools", ToolNode(TOOLS))
-    graph.add_node("finalize", _finalize_node)
+    graph.add_node("finalize", lambda state: _finalize_node(state, finalize_llm))
 
     graph.set_entry_point("agent")
     graph.add_conditional_edges(
