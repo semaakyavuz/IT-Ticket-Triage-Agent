@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Triage Agent</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">&#9670;</span>
+      <span class="brand-name">Triage<span class="accent">Agent</span></span>
+    </div>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="triage" type="button">Triage</button>
+      <button class="tab-btn" data-tab="dashboard" type="button">Dashboard</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="view-triage" class="view active">
+      <div class="triage-grid">
+        <div class="panel">
+          <h2>Yeni Ticket</h2>
+          <form id="ticket-form">
+            <textarea
+              id="ticket-text"
+              rows="5"
+              placeholder="Örn: VPN bağlantısı sürekli kopuyor, uzaktan çalışamıyorum"
+              required
+            ></textarea>
+            <button id="submit-btn" type="submit">Analiz Et</button>
+          </form>
+          <p id="error" class="error-box" hidden></p>
+
+          <ol id="steps" class="steps"></ol>
+        </div>
+
+        <div class="panel result-panel" id="result-panel">
+          <div class="result-badges">
+            <span class="badge badge-category" id="badge-category">—</span>
+            <span class="badge badge-priority" id="badge-priority">—</span>
+          </div>
+
+          <h3>Önerilen Çözüm / Yönlendirme</h3>
+          <p id="solution-text" class="solution-text">
+            Henüz bir sonuç yok — soldaki forma bir ticket yazıp gönder.
+          </p>
+          <p id="assigned-team" class="assigned-team"></p>
+
+          <h3>Benzer Geçmiş Ticket'lar (RAG)</h3>
+          <div id="similar-list" class="similar-list">
+            <p class="muted">Henüz bir arama yapılmadı.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-dashboard" class="view">
+      <div class="panel">
+        <div class="dashboard-header">
+          <h2>Dashboard</h2>
+          <div class="dashboard-actions">
+            <span id="history-count" class="muted"></span>
+            <button id="clear-history-btn" class="ghost-btn" type="button">Geçmişi sıfırla</button>
+          </div>
+        </div>
+
+        <p id="dashboard-empty" class="muted">
+          Henüz ticket gönderilmedi. Triage sekmesinden bir ticket gönder,
+          buradaki grafikler otomatik güncellenir.
+        </p>
+
+        <div id="dashboard-charts" class="charts-grid" hidden>
+          <div class="chart-card">
+            <canvas id="category-chart"></canvas>
+          </div>
+          <div class="chart-card">
+            <canvas id="priority-chart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/vendor/chart.min.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

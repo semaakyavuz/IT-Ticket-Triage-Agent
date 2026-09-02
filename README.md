@@ -71,6 +71,11 @@ app/
     tools.py            search_similar_tickets, get_priority, assign_team
     state.py             LangGraph state şeması
     graph.py             LangGraph grafiği (agent ↔ tools döngüsü)
+  static/               Vanilla JS + Chart.js frontend (build aracı yok)
+    index.html           Triage ve Dashboard sekmeleri
+    css/styles.css        Koyu tema, özgün stil
+    js/app.js              Form, adım animasyonu, grafikler
+    vendor/chart.min.js    Chart.js (CDN'siz, local'e gömülü)
 scripts/
   init_db.py            SQLite'ı oluşturur ve mock veriyle doldurur
   index_tickets.py      Mock ticket'ları Chroma'ya embed'ler
@@ -113,6 +118,17 @@ python -m scripts.index_tickets
 # 3) API'yi başlat
 uvicorn app.main:app --reload
 ```
+
+Sonra tarayıcıda **http://localhost:8000** adresini aç — build aracı gerektirmeyen
+vanilla JS + Chart.js bir arayüz açılır:
+
+- **Triage** sekmesi: ticket metnini yazıp gönder; kategori/öncelik renkli
+  badge olarak, agent'ın adımları (kategori → öncelik → RAG araması → ekip
+  ataması) küçük bir zaman çizelgesi animasyonuyla, bulunan benzer ticket'lar
+  ise benzerlik yüzdesiyle kart listesi halinde gösterilir.
+- **Dashboard** sekmesi: o ana kadar (bu tarayıcıda, `localStorage` üzerinden)
+  gönderilen ticket'ların kategori dağılımı (pasta grafik) ve öncelik dağılımı
+  (bar grafik) — Chart.js ile, backend'e ek bir endpoint eklemeden.
 
 ### Örnek istek
 

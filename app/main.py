@@ -1,10 +1,15 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.agent.graph import build_graph
 from app.db.database import init_db, seed_if_empty
 from app.schemas import TicketRequest, TicketResponse
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 _graph = None
 
@@ -24,6 +29,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="IT Ticket Triage Agent", lifespan=lifespan)
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def frontend_index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.post("/ticket", response_model=TicketResponse)
