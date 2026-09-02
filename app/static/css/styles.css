@@ -354,6 +354,19 @@ button[type="submit"]:disabled {
   background: rgba(52, 211, 153, 0.08);
 }
 
+.confidence-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+}
+
 /* Result panel */
 
 .result-panel h3 {

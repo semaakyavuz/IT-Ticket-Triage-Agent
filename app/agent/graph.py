@@ -94,6 +94,20 @@ def _extract_tool_result(messages: list, tool_name: str) -> str | None:
     return None
 
 
+def _estimate_confidence(similar_tickets: list[dict]) -> int:
+    """RAG'daki en benzer ticket'in mesafe skorundan kabaca bir güven yüzdesi türetir.
+
+    Kalibre edilmiş bir olasılık değildir, sadece karşılaştırmalı/görsel bir
+    göstergedir: skor küçüldükçe (daha benzer ticket bulundukça) güven artar.
+    Hiç benzer ticket bulunamadıysa nötr bir değer (%50) döner.
+    """
+    if not similar_tickets:
+        return 50
+    best_score = min(t["score"] for t in similar_tickets)
+    confidence = round(100 / (1 + max(best_score, 0)))
+    return max(0, min(confidence, 100))
+
+
 def _compose_solution_text(
     llm: ChatOllama,
     category: str | None,
@@ -131,11 +145,13 @@ def _finalize_node(state: TicketState, llm: ChatOllama) -> dict:
     except json.JSONDecodeError:
         similar_tickets = []
 
+    confidence = _estimate_confidence(similar_tickets)
     solution = _compose_solution_text(llm, category, priority, similar_tickets, assigned_team)
 
     return {
         "category": category,
         "priority": priority,
+        "confidence": confidence,
         "similar_tickets": similar_tickets,
         "solution": solution,
         "assigned_team": assigned_team,

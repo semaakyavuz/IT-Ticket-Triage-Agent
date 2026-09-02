@@ -196,6 +196,14 @@ function renderResult(data) {
   priorityBadge.textContent = data.priority ?? "—";
   priorityBadge.className = `badge badge-priority priority-${prioritySlug(data.priority)}`;
 
+  const confidenceChip = document.getElementById("confidence-chip");
+  if (data.confidence != null) {
+    confidenceChip.hidden = false;
+    confidenceChip.textContent = `Güven: %${data.confidence}`;
+  } else {
+    confidenceChip.hidden = true;
+  }
+
   document.getElementById("solution-text").textContent =
     data.solution || "Belirli bir çözüm metni üretilmedi.";
 

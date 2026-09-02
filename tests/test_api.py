@@ -13,7 +13,11 @@ def test_triage_ticket_returns_agent_result(make_client):
     response = client.post("/ticket", json={"text": "Excel dosyası açılırken çöküyor"})
 
     assert response.status_code == 200
-    assert response.json() == FAKE_RESULT
+    body = response.json()
+    # FakeGraph "confidence" alani doldurmuyor, agent grafiginin kendisi
+    # _estimate_confidence ile hesapliyor (bkz. tests/test_agent_graph.py)
+    assert body.pop("confidence") is None
+    assert body == FAKE_RESULT
 
 
 def test_triage_ticket_rejects_empty_text(make_client):

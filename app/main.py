@@ -44,6 +44,7 @@ def triage_ticket(payload: TicketRequest, graph=Depends(get_agent_graph)) -> Tic
     return TicketResponse(
         category=result.get("category"),
         priority=result.get("priority"),
+        confidence=result.get("confidence"),
         similar_tickets=result.get("similar_tickets", []),
         solution=result.get("solution"),
         assigned_team=result.get("assigned_team"),

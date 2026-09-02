@@ -20,6 +20,9 @@ class SimilarTicket(BaseModel):
 class TicketResponse(BaseModel):
     category: Optional[str] = None
     priority: Optional[str] = None
+    confidence: Optional[int] = Field(
+        default=None, description="RAG'daki en benzer ticket skorundan türetilen, 0-100 arası kaba bir güven yüzdesi"
+    )
     similar_tickets: list[SimilarTicket] = []
     solution: Optional[str] = None
     assigned_team: Optional[str] = None
