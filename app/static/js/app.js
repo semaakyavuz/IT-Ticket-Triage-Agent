@@ -1,5 +1,5 @@
 const API_URL = "/ticket";
-const HISTORY_KEY = "triage_history_v1";
+const HISTORY_URL = "/tickets/history";
 
 const CATEGORY_LABELS = {
   "donanım": "Donanım",
@@ -46,7 +46,7 @@ function switchTab(tab) {
     view.classList.toggle("active", view.id === `view-${tab}`);
   });
   if (tab === "dashboard") {
-    renderDashboard();
+    refreshDashboard();
   }
 }
 
@@ -149,7 +149,7 @@ form.addEventListener("submit", async (event) => {
     const data = await response.json();
     finishSteps(data);
     renderResult(data);
-    saveToHistory(data);
+    refreshHistoryTable();
   } catch (err) {
     stopStepsWithError();
     showError(err.message || "Bilinmeyen bir hata oluştu.");
@@ -245,22 +245,57 @@ function renderResult(data) {
 
 // --- History + dashboard ------------------------------------------------
 
-function loadHistory() {
-  try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
-  } catch {
-    return [];
-  }
+async function fetchHistory() {
+  const response = await fetch(HISTORY_URL);
+  if (!response.ok) throw new Error("Ticket geçmişi alınamadı");
+  return response.json();
 }
 
-function saveToHistory(data) {
-  const history = loadHistory();
-  history.push({
-    category: data.category,
-    priority: data.priority,
-    timestamp: new Date().toISOString(),
-  });
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+function truncate(text, maxLen) {
+  if (!text) return "";
+  return text.length > maxLen ? `${text.slice(0, maxLen)}…` : text;
+}
+
+function formatDate(sqliteUtcTimestamp) {
+  // Backend "YYYY-MM-DD HH:MM:SS" (UTC) formatında dönüyor.
+  const date = new Date(`${sqliteUtcTimestamp.replace(" ", "T")}Z`);
+  if (Number.isNaN(date.getTime())) return sqliteUtcTimestamp;
+  return date.toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function renderHistoryTable(history) {
+  const tbody = document.getElementById("history-tbody");
+
+  if (!history || history.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="muted">Henüz ticket gönderilmedi.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = history
+    .map((item) => {
+      const correctionText = item.is_corrected
+        ? `${categoryLabel(item.corrected_category)} olarak düzeltildi`
+        : "—";
+      return `
+        <tr>
+          <td>${formatDate(item.created_at)}</td>
+          <td class="history-text" title="${escapeHtml(item.ticket_text)}">${escapeHtml(truncate(item.ticket_text, 60))}</td>
+          <td>${categoryLabel(item.category)}</td>
+          <td>${item.priority ? `<span class="badge priority-${prioritySlug(item.priority)}">${escapeHtml(item.priority)}</span>` : "—"}</td>
+          <td>${escapeHtml(item.assigned_team ?? "—")}</td>
+          <td class="${item.is_corrected ? "corrected" : "muted"}">${correctionText}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+async function refreshHistoryTable() {
+  try {
+    renderHistoryTable(await fetchHistory());
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 function chartBaseOptions(title) {
@@ -273,13 +308,20 @@ function chartBaseOptions(title) {
   };
 }
 
-function renderDashboard() {
-  const history = loadHistory();
+async function refreshDashboard() {
+  try {
+    renderDashboardCharts(await fetchHistory());
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function renderDashboardCharts(history) {
   const emptyState = document.getElementById("dashboard-empty");
   const chartsWrap = document.getElementById("dashboard-charts");
   const historyCount = document.getElementById("history-count");
 
-  if (history.length === 0) {
+  if (!history || history.length === 0) {
     emptyState.hidden = false;
     chartsWrap.hidden = true;
     historyCount.textContent = "";
@@ -288,7 +330,7 @@ function renderDashboard() {
 
   emptyState.hidden = true;
   chartsWrap.hidden = false;
-  historyCount.textContent = `${history.length} ticket gönderildi (bu tarayıcıda)`;
+  historyCount.textContent = `${history.length} ticket kaydedildi (backend'deki ticket geçmişi)`;
 
   const categories = ["donanım", "yazılım", "ağ", "erişim"];
   const categoryCounts = categories.map((c) => history.filter((h) => h.category === c).length);
@@ -325,7 +367,6 @@ function renderDashboard() {
   });
 }
 
-document.getElementById("clear-history-btn").addEventListener("click", () => {
-  localStorage.removeItem(HISTORY_KEY);
-  renderDashboard();
-});
+// --- Init ---------------------------------------------------------------
+
+refreshHistoryTable();

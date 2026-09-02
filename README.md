@@ -123,12 +123,15 @@ Sonra tarayıcıda **http://localhost:8000** adresini aç — build aracı gerek
 vanilla JS + Chart.js bir arayüz açılır:
 
 - **Triage** sekmesi: ticket metnini yazıp gönder; kategori/öncelik renkli
-  badge olarak, agent'ın adımları (kategori → öncelik → RAG araması → ekip
-  ataması) küçük bir zaman çizelgesi animasyonuyla, bulunan benzer ticket'lar
-  ise benzerlik yüzdesiyle kart listesi halinde gösterilir.
-- **Dashboard** sekmesi: o ana kadar (bu tarayıcıda, `localStorage` üzerinden)
-  gönderilen ticket'ların kategori dağılımı (pasta grafik) ve öncelik dağılımı
-  (bar grafik) — Chart.js ile, backend'e ek bir endpoint eklemeden.
+  badge'lerin yanında bir güven yüzdesi (`confidence`), agent'ın adımları
+  (kategori → öncelik → RAG araması → ekip ataması) küçük bir zaman çizelgesi
+  animasyonuyla, bulunan benzer ticket'lar benzerlik yüzdesiyle kart listesi
+  halinde gösterilir. Sonucun altında, backend'deki `ticket_history` tablosundan
+  gelen (en yeni üstte) bir **ticket geçmişi tablosu** listelenir.
+- **Dashboard** sekmesi: `GET /tickets/history`'den gelen gerçek veriye göre
+  kategori dağılımı (pasta grafik) ve öncelik dağılımı (bar grafik) — Chart.js
+  ile. Veri artık `localStorage` değil, backend'deki SQLite tablosu; yani tüm
+  kullanıcılar/oturumlar arasında paylaşılır.
 
 ### Örnek istek
 

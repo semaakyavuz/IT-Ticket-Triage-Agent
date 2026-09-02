@@ -14,6 +14,7 @@ def test_triage_ticket_returns_agent_result(make_client):
 
     assert response.status_code == 200
     body = response.json()
+    assert isinstance(body.pop("ticket_id"), int)
     # FakeGraph "confidence" alani doldurmuyor, agent grafiginin kendisi
     # _estimate_confidence ile hesapliyor (bkz. tests/test_agent_graph.py)
     assert body.pop("confidence") is None
@@ -34,3 +35,41 @@ def test_triage_ticket_requires_text_field(make_client):
     response = client.post("/ticket", json={})
 
     assert response.status_code == 422
+
+
+def test_ticket_history_starts_empty(make_client):
+    client = make_client(FAKE_RESULT)
+
+    response = client.get("/tickets/history")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_ticket_creates_history_entry(make_client):
+    client = make_client(FAKE_RESULT)
+
+    client.post("/ticket", json={"text": "Excel dosyası açılırken çöküyor"})
+    response = client.get("/tickets/history")
+
+    assert response.status_code == 200
+    history = response.json()
+    assert len(history) == 1
+    entry = history[0]
+    assert entry["ticket_text"] == "Excel dosyası açılırken çöküyor"
+    assert entry["category"] == FAKE_RESULT["category"]
+    assert entry["priority"] == FAKE_RESULT["priority"]
+    assert entry["assigned_team"] == FAKE_RESULT["assigned_team"]
+    assert entry["corrected_category"] is None
+    assert entry["is_corrected"] is False
+
+
+def test_ticket_history_lists_newest_first(make_client):
+    client = make_client(FAKE_RESULT)
+
+    client.post("/ticket", json={"text": "ilk ticket"})
+    client.post("/ticket", json={"text": "ikinci ticket"})
+
+    history = client.get("/tickets/history").json()
+
+    assert [item["ticket_text"] for item in history] == ["ikinci ticket", "ilk ticket"]

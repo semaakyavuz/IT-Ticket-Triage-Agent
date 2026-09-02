@@ -6,8 +6,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.agent.graph import build_graph
-from app.db.database import init_db, seed_if_empty
-from app.schemas import TicketRequest, TicketResponse
+from app.config import SQLITE_DB_PATH
+from app.db.database import fetch_ticket_history, init_db, insert_ticket_history, seed_if_empty
+from app.schemas import TicketHistoryItem, TicketRequest, TicketResponse
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -19,6 +20,12 @@ def get_agent_graph():
     if _graph is None:
         _graph = build_graph()
     return _graph
+
+
+def get_db_path() -> str:
+    """Testlerde geçmiş tablosunu gerçek dev veritabanından izole etmek için
+    override edilebilen basit bir dependency (bkz. tests/conftest.py)."""
+    return SQLITE_DB_PATH
 
 
 @asynccontextmanager
@@ -39,9 +46,21 @@ def frontend_index() -> FileResponse:
 
 
 @app.post("/ticket", response_model=TicketResponse)
-def triage_ticket(payload: TicketRequest, graph=Depends(get_agent_graph)) -> TicketResponse:
+def triage_ticket(
+    payload: TicketRequest,
+    graph=Depends(get_agent_graph),
+    db_path: str = Depends(get_db_path),
+) -> TicketResponse:
     result = graph.invoke({"ticket_text": payload.text, "messages": []})
+    ticket_id = insert_ticket_history(
+        ticket_text=payload.text,
+        category=result.get("category"),
+        priority=result.get("priority"),
+        assigned_team=result.get("assigned_team"),
+        db_path=db_path,
+    )
     return TicketResponse(
+        ticket_id=ticket_id,
         category=result.get("category"),
         priority=result.get("priority"),
         confidence=result.get("confidence"),
@@ -49,3 +68,8 @@ def triage_ticket(payload: TicketRequest, graph=Depends(get_agent_graph)) -> Tic
         solution=result.get("solution"),
         assigned_team=result.get("assigned_team"),
     )
+
+
+@app.get("/tickets/history", response_model=list[TicketHistoryItem])
+def get_ticket_history(db_path: str = Depends(get_db_path)) -> list[dict]:
+    return fetch_ticket_history(db_path=db_path)
