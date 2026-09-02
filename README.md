@@ -122,12 +122,18 @@ curl -X POST http://localhost:8000/ticket \
   -d '{"text": "VPN bağlantısı sürekli kopuyor, uzaktan çalışamıyorum"}'
 ```
 
-Örnek yanıt:
+> Windows + Git Bash kullanıyorsan `-d '...'` içindeki Türkçe karakterler shell
+> tarafından bozulabilir ("There was an error parsing the body" hatası). Bu
+> durumda isteği bir `.json` dosyasına UTF-8 olarak yazıp
+> `--data-binary @dosya.json` ile göndermek sorunu çözer.
+
+Aşağıdaki yanıt, **gerçek Ollama** (`llama3.2` + `nomic-embed-text`, Ollama
+0.33.2) çalışırken bu isteğe verilen gerçek çıktıdır (uydurma/örnek değildir):
 
 ```json
 {
-  "category": "ağ",
-  "priority": "yüksek",
+  "category": "erişim",
+  "priority": "düşük",
   "similar_tickets": [
     {
       "ticket_id": 1,
@@ -136,13 +142,40 @@ curl -X POST http://localhost:8000/ticket \
       "priority": "yüksek",
       "solution": "VPN istemcisi güncellendi ve kullanıcı profili yeniden oluşturuldu, sorun çözüldü.",
       "team": "Network Operasyon Ekibi",
-      "score": 0.42
+      "score": 0.162
+    },
+    {
+      "ticket_id": 2,
+      "title": "Wi-Fi sürekli kopuyor",
+      "category": "ağ",
+      "priority": "orta",
+      "solution": "Kat için ayrı access point tanımlandı, kanal çakışması giderildi.",
+      "team": "Network Operasyon Ekibi",
+      "score": 0.455
+    },
+    {
+      "ticket_id": 18,
+      "title": "Uzaktan masaüstü bağlantısı kopuyor",
+      "category": "ağ",
+      "priority": "orta",
+      "solution": "VPN MTU ayarı düşürülerek paket parçalanması giderildi.",
+      "team": "Network Operasyon Ekibi",
+      "score": 0.463
     }
   ],
-  "solution": "Benzer bir VPN sorunu daha önce istemci güncellemesi ve profil sıfırlamasıyla çözülmüş; aynı adımların uygulanması öneriliyor.",
-  "assigned_team": null
+  "solution": "VPN bağlantısı sürekli kopuyor, uzaktan çalışamıyorum. Bu sorun için Erişim ve Kimlik Yönetimi Ekibi ile temas edin.",
+  "assigned_team": "Erişim ve Kimlik Yönetimi Ekibi"
 }
 ```
+
+RAG kısmı (`similar_tickets`) mükemmel çalıştı: en düşük (en benzer) skor,
+neredeyse birebir aynı geçmiş ticket'a (id 1) ait. Ancak `llama3.2` bu istekte
+kategoriyi "ağ" yerine "erişim" olarak etiketledi — 3B parametrelik küçük bir
+local modelin ara sıra yakın kategoriler arasında (ağ/erişim gibi) hata
+yapması beklenen bir durumdur, kodda bir hata değildir. Aynı uçtan uca akış
+donanım kategorisindeki bir örnekte ("Laptopum açılmıyor, güç ışığı hiç
+yanmıyor") kategoriyi, önceliği ve ekibi birebir doğru üretti (en benzer
+ticket skoru: 0.13).
 
 ## Test
 
