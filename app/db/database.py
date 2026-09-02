@@ -96,3 +96,24 @@ def fetch_ticket_history(db_path: str = SQLITE_DB_PATH) -> list[dict]:
     with get_connection(db_path) as conn:
         rows = conn.execute("SELECT * FROM ticket_history ORDER BY id DESC").fetchall()
         return [dict(row) for row in rows]
+
+
+def update_ticket_correction(
+    ticket_id: int, corrected_category: str, db_path: str = SQLITE_DB_PATH
+) -> dict | None:
+    """Bir ticket geçmişi kaydına kullanıcı düzeltmesini yazar.
+
+    Kayıt bulunamazsa None döner; bulunursa güncellenmiş satırı döner.
+    """
+    with get_connection(db_path) as conn:
+        cursor = conn.execute(
+            "UPDATE ticket_history SET corrected_category = ? WHERE id = ?",
+            (corrected_category, ticket_id),
+        )
+        conn.commit()
+        if cursor.rowcount == 0:
+            return None
+        row = conn.execute(
+            "SELECT * FROM ticket_history WHERE id = ?", (ticket_id,)
+        ).fetchone()
+        return dict(row)

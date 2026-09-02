@@ -1,14 +1,20 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.agent.graph import build_graph
 from app.config import SQLITE_DB_PATH
-from app.db.database import fetch_ticket_history, init_db, insert_ticket_history, seed_if_empty
-from app.schemas import TicketHistoryItem, TicketRequest, TicketResponse
+from app.db.database import (
+    fetch_ticket_history,
+    init_db,
+    insert_ticket_history,
+    seed_if_empty,
+    update_ticket_correction,
+)
+from app.schemas import CorrectionRequest, TicketHistoryItem, TicketRequest, TicketResponse
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -73,3 +79,15 @@ def triage_ticket(
 @app.get("/tickets/history", response_model=list[TicketHistoryItem])
 def get_ticket_history(db_path: str = Depends(get_db_path)) -> list[dict]:
     return fetch_ticket_history(db_path=db_path)
+
+
+@app.patch("/tickets/history/{ticket_id}", response_model=TicketHistoryItem)
+def correct_ticket_history(
+    ticket_id: int,
+    payload: CorrectionRequest,
+    db_path: str = Depends(get_db_path),
+) -> dict:
+    updated = update_ticket_correction(ticket_id, payload.corrected_category, db_path=db_path)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Ticket geçmişte bulunamadı")
+    return updated

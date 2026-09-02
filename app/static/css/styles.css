@@ -396,6 +396,26 @@ button[type="submit"]:disabled {
   margin: 0.4rem 0 0;
 }
 
+.correction-box {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--border);
+}
+
+.correction-box select {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.35rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
 .muted {
   color: var(--text-muted);
   font-size: 0.85rem;

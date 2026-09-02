@@ -31,6 +31,7 @@ const STEP_LABELS = [
 let stepTimer = null;
 let categoryChart = null;
 let priorityChart = null;
+let currentTicketId = null;
 
 // --- Tabs -------------------------------------------------------------
 
@@ -210,6 +211,12 @@ function renderResult(data) {
   const assignedTeamEl = document.getElementById("assigned-team");
   assignedTeamEl.textContent = data.assigned_team ? `Yönlendirilen ekip: ${data.assigned_team}` : "";
 
+  currentTicketId = data.ticket_id ?? null;
+  const correctionBox = document.getElementById("correction-box");
+  correctionBox.hidden = currentTicketId == null;
+  document.getElementById("correction-select").value = "";
+  document.getElementById("correction-status").textContent = "";
+
   const list = document.getElementById("similar-list");
   const tickets = data.similar_tickets || [];
 
@@ -367,6 +374,44 @@ function renderDashboardCharts(history) {
   });
 }
 
+// --- Manual correction ---------------------------------------------------
+
+function populateCorrectionSelect() {
+  const select = document.getElementById("correction-select");
+  const options = Object.entries(CATEGORY_LABELS)
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join("");
+  select.innerHTML = `<option value="" disabled selected>Doğru kategoriyi seç</option>${options}`;
+}
+
+document.getElementById("correction-save-btn").addEventListener("click", async () => {
+  const select = document.getElementById("correction-select");
+  const statusEl = document.getElementById("correction-status");
+  const correctedCategory = select.value;
+
+  if (!correctedCategory || currentTicketId == null) return;
+
+  statusEl.textContent = "Kaydediliyor...";
+  try {
+    const response = await fetch(`/tickets/history/${currentTicketId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ corrected_category: correctedCategory }),
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(typeof body.detail === "string" ? body.detail : `HTTP ${response.status}`);
+    }
+
+    statusEl.textContent = "Düzeltme kaydedildi ✓";
+    refreshHistoryTable();
+  } catch (err) {
+    statusEl.textContent = `Hata: ${err.message}`;
+  }
+});
+
 // --- Init ---------------------------------------------------------------
 
+populateCorrectionSelect();
 refreshHistoryTable();

@@ -1,6 +1,8 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
+
+from app.config import CATEGORIES
 
 
 class TicketRequest(BaseModel):
@@ -44,3 +46,14 @@ class TicketHistoryItem(BaseModel):
     @property
     def is_corrected(self) -> bool:
         return self.corrected_category is not None
+
+
+class CorrectionRequest(BaseModel):
+    corrected_category: str
+
+    @field_validator("corrected_category")
+    @classmethod
+    def _validate_category(cls, value: str) -> str:
+        if value not in CATEGORIES:
+            raise ValueError(f"Geçersiz kategori: {value!r}. Beklenen değerler: {CATEGORIES}")
+        return value

@@ -73,3 +73,35 @@ def test_ticket_history_lists_newest_first(make_client):
     history = client.get("/tickets/history").json()
 
     assert [item["ticket_text"] for item in history] == ["ikinci ticket", "ilk ticket"]
+
+
+def test_correct_ticket_history_updates_category(make_client):
+    client = make_client(FAKE_RESULT)
+    ticket_id = client.post("/ticket", json={"text": "Excel dosyası açılırken çöküyor"}).json()["ticket_id"]
+
+    response = client.patch(f"/tickets/history/{ticket_id}", json={"corrected_category": "ağ"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["corrected_category"] == "ağ"
+    assert body["is_corrected"] is True
+
+    history = client.get("/tickets/history").json()
+    assert history[0]["corrected_category"] == "ağ"
+
+
+def test_correct_ticket_history_rejects_unknown_category(make_client):
+    client = make_client(FAKE_RESULT)
+    ticket_id = client.post("/ticket", json={"text": "Excel dosyası açılırken çöküyor"}).json()["ticket_id"]
+
+    response = client.patch(f"/tickets/history/{ticket_id}", json={"corrected_category": "bilinmeyen"})
+
+    assert response.status_code == 422
+
+
+def test_correct_ticket_history_404_for_missing_id(make_client):
+    client = make_client(FAKE_RESULT)
+
+    response = client.patch("/tickets/history/999", json={"corrected_category": "ağ"})
+
+    assert response.status_code == 404

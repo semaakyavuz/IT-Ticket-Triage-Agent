@@ -1,4 +1,9 @@
-from app.db.database import fetch_ticket_history, init_db, insert_ticket_history
+from app.db.database import (
+    fetch_ticket_history,
+    init_db,
+    insert_ticket_history,
+    update_ticket_correction,
+)
 
 
 def _db(tmp_path):
@@ -36,3 +41,22 @@ def test_insert_ticket_history_allows_null_fields(tmp_path):
     assert entry["category"] is None
     assert entry["priority"] is None
     assert entry["assigned_team"] is None
+
+
+def test_update_ticket_correction_sets_corrected_category(tmp_path):
+    db_path = _db(tmp_path)
+    ticket_id = insert_ticket_history("bir ticket", "yazılım", "orta", "Uygulama Destek Ekibi", db_path=db_path)
+
+    updated = update_ticket_correction(ticket_id, "ağ", db_path=db_path)
+
+    assert updated is not None
+    assert updated["id"] == ticket_id
+    assert updated["corrected_category"] == "ağ"
+    # Orijinal (modelin verdiği) kategori korunuyor, sadece düzeltme ayrı alanda.
+    assert updated["category"] == "yazılım"
+
+
+def test_update_ticket_correction_returns_none_for_missing_id(tmp_path):
+    db_path = _db(tmp_path)
+
+    assert update_ticket_correction(999, "ağ", db_path=db_path) is None
