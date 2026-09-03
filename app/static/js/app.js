@@ -29,6 +29,16 @@ const STEP_LABELS = [
   "Ekip ataması",
 ];
 
+// Ziyaretçi ne yazacağını düşünmesin: tek tıkla doldurulan örnekler.
+const SAMPLE_TICKETS = [
+  { label: "VPN kopuyor", text: "VPN bağlantısı sürekli kopuyor, uzaktan çalışamıyorum" },
+  { label: "Laptop açılmıyor", text: "Laptopum açılmıyor, güç ışığı hiç yanmıyor" },
+  { label: "Excel çöküyor", text: "Büyük bir Excel dosyasını açarken uygulama kapanıyor" },
+  { label: "Şifre / hesap", text: "Şifremi unuttum, hesabıma giremiyorum" },
+  { label: "Üretim durdu", text: "Üretim sunucusuna kimse erişemiyor, tüm ekip çalışamıyor" },
+  { label: "EN örnek", text: "My VPN keeps disconnecting every few minutes while working from home" },
+];
+
 let stepTimer = null;
 let categoryChart = null;
 let priorityChart = null;
@@ -441,7 +451,43 @@ document.getElementById("correction-save-btn").addEventListener("click", async (
   }
 });
 
+// --- Demo helpers ---------------------------------------------------------
+
+function renderSampleChips() {
+  const container = document.getElementById("sample-chips");
+  const textarea = document.getElementById("ticket-text");
+
+  container.innerHTML = SAMPLE_TICKETS.map(
+    (sample, index) =>
+      `<button type="button" class="sample-chip" data-index="${index}">${escapeHtml(sample.label)}</button>`
+  ).join("");
+
+  container.querySelectorAll(".sample-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      textarea.value = SAMPLE_TICKETS[Number(chip.dataset.index)].text;
+      textarea.focus();
+    });
+  });
+}
+
+async function loadModelInfo() {
+  const footerEl = document.getElementById("model-info");
+  const howtoEl = document.getElementById("howto-model");
+  try {
+    const response = await fetch("/health");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const info = await response.json();
+    const text = `Canlı model: ${info.llm_model} (${info.llm_provider}) · embedding: ${info.embedding_model.split("/").pop()} (${info.embedding_provider})`;
+    footerEl.textContent = text;
+    howtoEl.textContent = text;
+  } catch (err) {
+    footerEl.textContent = "canlı model bilgisi alınamadı";
+  }
+}
+
 // --- Init ---------------------------------------------------------------
 
 populateCorrectionSelect();
+renderSampleChips();
+loadModelInfo();
 refreshHistoryTable();

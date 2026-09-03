@@ -23,6 +23,10 @@
       <div class="triage-grid">
         <div class="panel">
           <h2>Yeni Ticket</h2>
+          <div class="samples">
+            <span class="muted">Örnek dene:</span>
+            <div id="sample-chips" class="sample-chips"></div>
+          </div>
           <form id="ticket-form">
             <textarea
               id="ticket-text"
@@ -35,6 +39,24 @@
           <p id="error" class="error-box" hidden></p>
 
           <ol id="steps" class="steps"></ol>
+
+          <details class="howto">
+            <summary>Nasıl çalışıyor?</summary>
+            <ol>
+              <li>Metin, <strong>LangGraph</strong> ile kurulmuş bir agent'a gider. Agent
+                (Llama) sorunu <em>donanım / yazılım / ağ / erişim</em> olarak sınıflandırır.</li>
+              <li>Kural tabanlı <code>get_priority</code> tool'u ile öncelik belirlenir.</li>
+              <li><code>search_similar_tickets</code> tool'u, geçmiş ticket'ları
+                <strong>ChromaDB</strong>'de embedding'lerle arar (RAG) ve en benzer
+                çözümleri getirir; güven yüzdesi en iyi eşleşmenin skorundan türetilir.</li>
+              <li>Benzer bir çözüm yoksa <code>assign_team</code> ile doğru ekibe yönlendirir.
+                Nihai cümle, tool bağlı olmayan ayrı bir modelle tek cümle Türkçe üretilir.</li>
+            </ol>
+            <p class="muted">Kategori/öncelik gibi yapısal alanlar modelin serbest metninden
+              değil, gerçekte çağırdığı tool'lardan deterministik olarak çıkarılır. Yanlış
+              sınıflandırmayı sonuç kartından düzeltebilirsin; düzeltmeler geçmişe kaydedilir.</p>
+            <p class="muted" id="howto-model"></p>
+          </details>
         </div>
 
         <div class="panel result-panel" id="result-panel">
@@ -113,6 +135,14 @@
       </div>
     </section>
   </main>
+
+  <footer class="footer">
+    <span>IT Ticket Triage Agent — FastAPI · LangGraph · ChromaDB · Llama</span>
+    <span class="footer-sep">·</span>
+    <a href="https://github.com/semaakyavuz/IT-Ticket-Triage-Agent" target="_blank" rel="noopener">GitHub</a>
+    <span class="footer-sep">·</span>
+    <span id="model-info" class="muted">canlı model bilgisi yükleniyor…</span>
+  </footer>
 
   <script src="/static/vendor/chart.min.js"></script>
   <script src="/static/js/app.js"></script>
