@@ -9,11 +9,18 @@ _default_store: Chroma | None = None
 
 
 def get_vector_store(
-    embeddings=None, persist_directory: str = CHROMA_PERSIST_DIR
+    embeddings=None,
+    persist_directory: str = CHROMA_PERSIST_DIR,
+    name: str | None = None,
 ) -> Chroma:
+    """`name` verilmezse koleksiyon adı embedding modelinden türetilir.
+
+    Testler izole, benzersiz bir ad verir: Chroma'nın bellek içi client'ı aynı
+    süreçte paylaşıldığı için aynı ada yazan testler birbirini etkiler.
+    """
     embeddings = embeddings or get_embeddings()
     return Chroma(
-        collection_name=collection_name(),
+        collection_name=name or collection_name(),
         embedding_function=embeddings,
         persist_directory=persist_directory,
         # Cosine: vektör normundan bağımsız, sağlayıcılar arasında tutarlı 0-2 aralığı.
@@ -29,6 +36,18 @@ def get_default_vector_store() -> Chroma:
     if _default_store is None:
         _default_store = get_vector_store()
     return _default_store
+
+
+def ensure_index(vector_store: Chroma | None = None, tickets: list[dict] | None = None) -> int:
+    """Koleksiyon boşsa ticket'ları indexler. Eklenen kayıt sayısını döner.
+
+    Açılışta çağrılır; her yeniden başlatmada diski sıfırlayan ortamlarda
+    (Hugging Face Spaces) index'in elle kurulmasına gerek kalmaz.
+    """
+    vector_store = vector_store or get_default_vector_store()
+    if vector_store.get(limit=1)["ids"]:
+        return 0
+    return index_tickets(vector_store, tickets)
 
 
 def _ticket_to_document(ticket: dict) -> Document:

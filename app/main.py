@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -5,6 +6,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app import config
 from app.agent.graph import build_graph
 from app.config import SQLITE_DB_PATH
 from app.db.database import (
@@ -15,6 +17,8 @@ from app.db.database import (
     seed_if_empty,
     update_ticket_correction,
 )
+from app.db.demo_history import seed_demo_history
+from app.rag.vector_store import ensure_index
 from app.schemas import (
     CorrectionRequest,
     RecurringAlert,
@@ -22,6 +26,11 @@ from app.schemas import (
     TicketRequest,
     TicketResponse,
 )
+
+# uvicorn sadece kendi logger'larını yapılandırır; uygulama loglarının (açılış
+# bootstrap'ı, LLM hataları) görünmesi için root logger'a minimal bir yapılandırma.
+logging.basicConfig(level=logging.INFO, format="%(levelname)s [%(name)s] %(message)s")
+logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -45,6 +54,24 @@ def get_db_path() -> str:
 async def lifespan(app: FastAPI):
     init_db()
     seed_if_empty()
+
+    if config.DEMO_SEED_HISTORY:
+        added = seed_demo_history()
+        if added:
+            logger.info("Demo ticket geçmişi eklendi: %d kayıt", added)
+
+    if config.AUTO_INDEX:
+        # Embedding sağlayıcısı (ör. Ollama) ayakta değilse uygulama yine de
+        # açılsın; /ticket ilk çağrıda anlaşılır bir hata verir.
+        try:
+            indexed = ensure_index()
+            if indexed:
+                logger.info("Vektör index'i kuruldu: %d ticket", indexed)
+        except Exception:
+            logger.exception(
+                "Vektör index'i açılışta kurulamadı (embedding sağlayıcısı erişilemez olabilir)"
+            )
+
     yield
 
 

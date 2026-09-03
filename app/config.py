@@ -26,5 +26,15 @@ FASTEMBED_CACHE_DIR = os.getenv("FASTEMBED_CACHE_DIR", "./data/fastembed")
 SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", "./data/tickets.db")
 CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./data/chroma")
 
+
+def _env_flag(name: str, default: bool) -> bool:
+    return os.getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
+
+
+# Açılışta mock ticket'ları vektör index'ine otomatik ekle (index boşsa).
+AUTO_INDEX = _env_flag("AUTO_INDEX", True)
+# Canlı demo: geçmiş tablosu boşsa gerçekçi örnek geçmiş ekle (dashboard boş kalmasın).
+DEMO_SEED_HISTORY = _env_flag("DEMO_SEED_HISTORY", False)
+
 CATEGORIES = ["donanım", "yazılım", "ağ", "erişim"]
 PRIORITIES = ["düşük", "orta", "yüksek"]

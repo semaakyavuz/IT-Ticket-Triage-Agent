@@ -5,6 +5,7 @@ from app.db.database import (
     insert_ticket_history,
     update_ticket_correction,
 )
+from app.db.demo_history import DEMO_HISTORY, seed_demo_history
 
 
 def _db(tmp_path):
@@ -95,3 +96,36 @@ def test_fetch_recurring_alerts_only_flags_categories_over_threshold(tmp_path):
     alerts = fetch_recurring_alerts(db_path=db_path)
 
     assert [a["category"] for a in alerts] == ["ağ"]
+
+
+def test_insert_ticket_history_accepts_explicit_created_at(tmp_path):
+    db_path = _db(tmp_path)
+
+    insert_ticket_history("eski ticket", "ağ", "orta", None, db_path=db_path, created_at="2020-01-01 10:00:00")
+
+    entry = fetch_ticket_history(db_path=db_path)[0]
+    assert entry["created_at"] == "2020-01-01 10:00:00"
+    # 7 günlük pencerenin dışında kaldığı için uyarıya sayılmamalı.
+    assert fetch_recurring_alerts(db_path=db_path) == []
+
+
+def test_seed_demo_history_populates_empty_table_once(tmp_path):
+    db_path = _db(tmp_path)
+
+    assert seed_demo_history(db_path=db_path) == len(DEMO_HISTORY)
+    assert seed_demo_history(db_path=db_path) == 0  # idempotent
+
+    history = fetch_ticket_history(db_path=db_path)
+    assert len(history) == len(DEMO_HISTORY)
+    # En yeni kayıt üstte (0 gün önce eklenen)
+    assert history[0]["ticket_text"] == DEMO_HISTORY[0][2]
+    assert any(item["corrected_category"] for item in history)
+
+
+def test_seed_demo_history_triggers_recurring_alert(tmp_path):
+    db_path = _db(tmp_path)
+    seed_demo_history(db_path=db_path)
+
+    alerts = fetch_recurring_alerts(db_path=db_path)
+
+    assert any(a["category"] == "ağ" and a["count"] > 3 for a in alerts)

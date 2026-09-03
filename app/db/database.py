@@ -76,9 +76,14 @@ def insert_ticket_history(
     priority: str | None,
     assigned_team: str | None,
     db_path: str = SQLITE_DB_PATH,
+    created_at: str | None = None,
 ) -> int:
-    """Gönderilen bir ticket'ı geçmiş tablosuna kaydeder, yeni kaydın id'sini döner."""
-    created_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    """Gönderilen bir ticket'ı geçmiş tablosuna kaydeder, yeni kaydın id'sini döner.
+
+    `created_at` verilmezse şu an (UTC) kullanılır; demo verisi geçmişe yaymak
+    için açıkça verilebilir ("YYYY-MM-DD HH:MM:SS", SQLite datetime() ile uyumlu).
+    """
+    created_at = created_at or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     with get_connection(db_path) as conn:
         cursor = conn.execute(
             """
