@@ -6,7 +6,12 @@ from app.config import CATEGORIES
 
 
 class TicketRequest(BaseModel):
-    text: str = Field(..., min_length=1, description="Kullanıcının yazdığı IT sorunu")
+    text: str = Field(
+        ...,
+        min_length=1,
+        max_length=1000,
+        description="Kullanıcının yazdığı IT sorunu (LLM bağlamını korumak için en fazla 1000 karakter)",
+    )
 
 
 class SimilarTicket(BaseModel):

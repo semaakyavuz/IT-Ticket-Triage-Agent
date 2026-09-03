@@ -36,5 +36,9 @@ AUTO_INDEX = _env_flag("AUTO_INDEX", True)
 # Canlı demo: geçmiş tablosu boşsa gerçekçi örnek geçmiş ekle (dashboard boş kalmasın).
 DEMO_SEED_HISTORY = _env_flag("DEMO_SEED_HISTORY", False)
 
+# /ticket için IP başına dakikalık istek sınırı (0 = kapalı). Herkese açık demoda
+# tek bir ziyaretçinin LLM kotasını tüketmesini engeller.
+RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "10"))
+
 CATEGORIES = ["donanım", "yazılım", "ağ", "erişim"]
 PRIORITIES = ["düşük", "orta", "yüksek"]

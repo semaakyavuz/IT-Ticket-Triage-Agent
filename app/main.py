@@ -18,7 +18,9 @@ from app.db.database import (
     update_ticket_correction,
 )
 from app.db.demo_history import seed_demo_history
+from app.providers import describe_providers
 from app.rag.vector_store import ensure_index
+from app.ratelimit import rate_limit
 from app.schemas import (
     CorrectionRequest,
     RecurringAlert,
@@ -85,13 +87,24 @@ def frontend_index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
 
-@app.post("/ticket", response_model=TicketResponse)
+@app.post("/ticket", response_model=TicketResponse, dependencies=[Depends(rate_limit)])
 def triage_ticket(
     payload: TicketRequest,
     graph=Depends(get_agent_graph),
     db_path: str = Depends(get_db_path),
 ) -> TicketResponse:
-    result = graph.invoke({"ticket_text": payload.text, "messages": []})
+    try:
+        result = graph.invoke({"ticket_text": payload.text, "messages": []})
+    except Exception:
+        # Harici sağlayıcı (Groq kotası, Ollama kapalı, ağ) hatası: 500 + traceback
+        # yerine kullanıcıya anlaşılır, tekrar denenebilir bir mesaj.
+        logger.exception("Agent çalışırken hata oluştu")
+        raise HTTPException(
+            status_code=503,
+            detail="Yapay zekâ sağlayıcısına şu anda ulaşılamıyor (kota ya da bağlantı sorunu). "
+            "Lütfen bir dakika sonra tekrar deneyin.",
+        )
+
     ticket_id = insert_ticket_history(
         ticket_text=payload.text,
         category=result.get("category"),
@@ -130,3 +143,10 @@ def correct_ticket_history(
 @app.get("/tickets/alerts", response_model=list[RecurringAlert])
 def get_recurring_alerts(db_path: str = Depends(get_db_path)) -> list[dict]:
     return fetch_recurring_alerts(db_path=db_path)
+
+
+@app.get("/health")
+def health() -> dict:
+    """Hosting platformu için canlılık kontrolü + arayüzde gösterilen sağlayıcı bilgisi
+    (sır içermez)."""
+    return {"status": "ok", **describe_providers()}

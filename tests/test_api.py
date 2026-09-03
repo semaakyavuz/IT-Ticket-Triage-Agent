@@ -131,3 +131,54 @@ def test_recurring_alerts_triggers_above_threshold(make_client):
     assert alerts[0]["category"] == FAKE_RESULT["category"]
     assert alerts[0]["count"] == 4
     assert alerts[0]["threshold"] == 3
+
+
+def test_health_reports_providers_without_secrets(make_client):
+    client = make_client(FAKE_RESULT)
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert {"llm_provider", "llm_model", "embedding_provider", "embedding_model"} <= body.keys()
+    assert "api_key" not in str(body).lower()
+
+
+def test_triage_ticket_rejects_overlong_text(make_client):
+    client = make_client(FAKE_RESULT)
+
+    response = client.post("/ticket", json={"text": "a" * 1001})
+
+    assert response.status_code == 422
+
+
+def test_triage_ticket_returns_503_when_agent_fails(make_client):
+    from app.main import app, get_agent_graph
+
+    class BrokenGraph:
+        def invoke(self, state):
+            raise RuntimeError("Groq: rate limit exceeded")
+
+    client = make_client(FAKE_RESULT)
+    app.dependency_overrides[get_agent_graph] = lambda: BrokenGraph()
+
+    response = client.post("/ticket", json={"text": "VPN kopuyor"})
+
+    assert response.status_code == 503
+    assert "tekrar deneyin" in response.json()["detail"]
+    # Basarisiz istek gecmise yazilmamali.
+    assert client.get("/tickets/history").json() == []
+
+
+def test_triage_ticket_rate_limited_after_threshold(make_client):
+    from app.main import app
+    from app.ratelimit import SlidingWindowLimiter, rate_limit
+
+    limiter = SlidingWindowLimiter(limit=2, window_seconds=60)
+    client = make_client(FAKE_RESULT)
+    app.dependency_overrides[rate_limit] = lambda: limiter.check("test-client")
+
+    statuses = [client.post("/ticket", json={"text": "VPN kopuyor"}).status_code for _ in range(3)]
+
+    assert statuses == [200, 200, 429]
