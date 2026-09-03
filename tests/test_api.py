@@ -171,6 +171,24 @@ def test_triage_ticket_returns_503_when_agent_fails(make_client):
     assert client.get("/tickets/history").json() == []
 
 
+def test_triage_ticket_returns_503_when_provider_misconfigured(make_client, monkeypatch):
+    from app import config
+    from app import main as main_module
+    from app.main import app, get_agent_graph
+
+    client = make_client(FAKE_RESULT)
+    # Gercek dependency calissin: graf onbellegini sifirla, override'i kaldir.
+    app.dependency_overrides.pop(get_agent_graph, None)
+    monkeypatch.setattr(main_module, "_graph", None)
+    monkeypatch.setattr(config, "LLM_PROVIDER", "groq")
+    monkeypatch.setattr(config, "GROQ_API_KEY", "")
+
+    response = client.post("/ticket", json={"text": "VPN kopuyor"})
+
+    assert response.status_code == 503
+    assert "GROQ_API_KEY" in response.json()["detail"]
+
+
 def test_triage_ticket_rate_limited_after_threshold(make_client):
     from app.main import app
     from app.ratelimit import SlidingWindowLimiter, rate_limit

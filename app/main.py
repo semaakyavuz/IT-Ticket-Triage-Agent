@@ -42,7 +42,16 @@ _graph = None
 def get_agent_graph():
     global _graph
     if _graph is None:
-        _graph = build_graph()
+        try:
+            _graph = build_graph()
+        except Exception as exc:
+            # Yanlış/eksik sağlayıcı yapılandırması (ör. GROQ_API_KEY tanımsız):
+            # ham 500 yerine ne yapılması gerektiğini söyleyen bir 503.
+            logger.exception("Agent grafiği kurulamadı")
+            raise HTTPException(
+                status_code=503,
+                detail=f"Yapay zekâ sağlayıcısı yapılandırılamadı: {exc}",
+            )
     return _graph
 
 

@@ -1,3 +1,13 @@
+---
+title: IT Ticket Triage Agent
+emoji: 🎫
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # IT Ticket Triage Agent
 
 IT destek taleplerini otomatik olarak kategorize eden, önceliklendiren ve geçmiş
@@ -215,12 +225,62 @@ grafiği kullanılır. `get_priority`/`assign_team` zaten kural tabanlı olduğu
 için doğrudan test edilir. Bu yüzden CI, Ollama kurulu olmadan da (bkz.
 `.github/workflows/ci.yml`) çalışır.
 
+## Canlı demo & deploy (Hugging Face Spaces)
+
+Canlı demo, local'deki Ollama yerine iki ücretsiz bileşenle çalışır (kod aynı,
+sadece ortam değişkenleri farklı — bkz. `app/providers.py`):
+
+| Bileşen    | Local (varsayılan)             | Canlı demo (Dockerfile varsayılanı)                  |
+| ---------- | ------------------------------ | ---------------------------------------------------- |
+| LLM        | Ollama `llama3.2`              | Groq API, `llama-3.3-70b-versatile` (ücretsiz katman) |
+| Embedding  | Ollama `nomic-embed-text`      | fastembed `paraphrase-multilingual-MiniLM-L12-v2` (sunucu içi, CPU) |
+| Veri       | `./data` (kalıcı)              | Container diski (yeniden başlatınca sıfırlanır; açılışta otomatik seed + index) |
+
+Adımlar:
+
+1. [console.groq.com](https://console.groq.com) → ücretsiz **API key** al.
+2. [huggingface.co/new-space](https://huggingface.co/new-space) → SDK: **Docker**,
+   görünürlük: Public. Space adı örn. `it-ticket-triage-agent`.
+3. Space → **Settings → Variables and secrets** → Secret ekle: `GROQ_API_KEY`.
+   (İsteğe bağlı değişkenler: `GROQ_MODEL`, `RATE_LIMIT_PER_MINUTE`, `DEMO_SEED_HISTORY`.)
+4. Otomatik deploy için GitHub repo → **Settings**:
+   - Secret `HF_TOKEN`: Hugging Face **write** yetkili erişim token'ı
+   - Variable `HF_SPACE`: `<hf-kullanici-adi>/<space-adi>`
+   `main`'e her push'ta CI (pytest) geçerse `.github/workflows/deploy-hf.yml`
+   repo'yu Space'e push eder; Space kendi Docker build'ini yapar (~3-5 dk).
+5. Alternatif, elle: `git push https://huggingface.co/spaces/<kullanici>/<space> main`.
+
+Local'de aynı imajı denemek için:
+
+```bash
+docker build -t triage-agent .
+docker run -p 7860:7860 -e GROQ_API_KEY=gsk_... triage-agent
+# http://localhost:7860
+```
+
+Notlar: Space 48 saat kullanılmazsa uyur, ilk istekte ~30 sn'de uyanır.
+`/ticket` IP başına dakikada 10 istekle sınırlıdır (tek bir ziyaretçinin Groq
+kotasını tüketmemesi için). `/health` sağlayıcı/model bilgisini döner.
+
 ## Ortam değişkenleri
 
-| Değişken             | Varsayılan                | Açıklama                                |
-| -------------------- | -------------------------- | ---------------------------------------- |
-| `OLLAMA_BASE_URL`     | `http://localhost:11434`   | Ollama sunucu adresi                     |
-| `OLLAMA_CHAT_MODEL`   | `llama3.2`                 | Kategorizasyon/tool-calling için LLM     |
-| `OLLAMA_EMBED_MODEL`  | `nomic-embed-text`         | RAG embedding modeli                     |
-| `SQLITE_DB_PATH`      | `./data/tickets.db`        | Mock ticket verisinin tutulduğu SQLite   |
-| `CHROMA_PERSIST_DIR`  | `./data/chroma`            | Chroma'nın kalıcı vector index dizini    |
+| Değişken                 | Varsayılan                                   | Açıklama                                                        |
+| ------------------------ | -------------------------------------------- | --------------------------------------------------------------- |
+| `LLM_PROVIDER`           | `ollama`                                     | `ollama` \| `groq`                                              |
+| `EMBEDDING_PROVIDER`     | `ollama`                                     | `ollama` \| `fastembed`                                         |
+| `OLLAMA_BASE_URL`        | `http://localhost:11434`                     | Ollama sunucu adresi                                            |
+| `OLLAMA_CHAT_MODEL`      | `llama3.2`                                   | Ollama LLM'i (tool-calling + son cümle)                         |
+| `OLLAMA_EMBED_MODEL`     | `nomic-embed-text`                           | Ollama embedding modeli                                         |
+| `GROQ_API_KEY`           | —                                            | `LLM_PROVIDER=groq` iken zorunlu (secret, commit edilmez)       |
+| `GROQ_MODEL`             | `llama-3.3-70b-versatile`                    | Groq modeli                                                     |
+| `FASTEMBED_MODEL`        | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | Sunucu içi çok dilli embedding modeli          |
+| `FASTEMBED_CACHE_DIR`    | `./data/fastembed`                           | fastembed model önbelleği (Docker'da imaja gömülür)             |
+| `SQLITE_DB_PATH`         | `./data/tickets.db`                          | Mock ticket verisi + ticket geçmişi (SQLite)                    |
+| `CHROMA_PERSIST_DIR`     | `./data/chroma`                              | Chroma'nın kalıcı vector index dizini                           |
+| `AUTO_INDEX`             | `true`                                       | Açılışta index boşsa mock ticket'ları otomatik indexle          |
+| `DEMO_SEED_HISTORY`      | `false` (Docker'da `true`)                   | Geçmiş boşsa gerçekçi demo geçmişi ekle                         |
+| `RATE_LIMIT_PER_MINUTE`  | `10`                                         | `/ticket` için IP başına dakikalık sınır (`0` = kapalı)         |
+
+Not: Embedding sağlayıcısı/modeli değiştiğinde Chroma koleksiyon adı da
+değişir (farklı boyutlu vektörler aynı koleksiyona yazılamaz); `AUTO_INDEX`
+açıksa yeni koleksiyon açılışta otomatik kurulur.
