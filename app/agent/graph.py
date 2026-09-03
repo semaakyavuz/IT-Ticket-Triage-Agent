@@ -1,13 +1,14 @@
 import json
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_ollama import ChatOllama
+from langchain_core.language_models import BaseChatModel
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from app.agent.state import TicketState
 from app.agent.tools import assign_team, get_priority, search_similar_tickets
-from app.config import CATEGORIES, OLLAMA_BASE_URL, OLLAMA_CHAT_MODEL, PRIORITIES
+from app.config import CATEGORIES, PRIORITIES
+from app.providers import get_chat_model
 
 TOOLS = [search_similar_tickets, get_priority, assign_team]
 
@@ -50,13 +51,12 @@ sadece hangi ekibe yönlendirildiğini tek cümleyle belirt.
 aklına gelirse yerine Türkçe karşılığını yaz (örn. "gerekiyor", "öneriliyor")."""
 
 
-def _get_llm() -> ChatOllama:
-    return ChatOllama(
-        model=OLLAMA_CHAT_MODEL, base_url=OLLAMA_BASE_URL, temperature=0
-    ).bind_tools(TOOLS)
+def _get_llm() -> BaseChatModel:
+    """Tool-calling döngüsünde kullanılan model (sağlayıcı: app/providers.py)."""
+    return get_chat_model(temperature=0).bind_tools(TOOLS)
 
 
-def _get_plain_llm() -> ChatOllama:
+def _get_plain_llm() -> BaseChatModel:
     """Son cümleyi üreten, tool bağlı OLMAYAN model.
 
     Aynı (tool-bound) model kompozisyon için de kullanıldığında, model bir
@@ -64,10 +64,10 @@ def _get_plain_llm() -> ChatOllama:
     ile sonuçlanan bir AIMessage). Tool'ları hiç görmeyen ayrı bir örnek bu
     riski ortadan kaldırıyor.
     """
-    return ChatOllama(model=OLLAMA_CHAT_MODEL, base_url=OLLAMA_BASE_URL, temperature=0)
+    return get_chat_model(temperature=0)
 
 
-def _agent_node(state: TicketState, llm: ChatOllama) -> dict:
+def _agent_node(state: TicketState, llm: BaseChatModel) -> dict:
     messages = state["messages"]
     if not messages:
         messages = [
@@ -109,7 +109,7 @@ def _estimate_confidence(similar_tickets: list[dict]) -> int:
 
 
 def _compose_solution_text(
-    llm: ChatOllama,
+    llm: BaseChatModel,
     category: str | None,
     priority: str | None,
     similar_tickets: list[dict],
@@ -126,7 +126,7 @@ def _compose_solution_text(
     return response.content.strip()
 
 
-def _finalize_node(state: TicketState, llm: ChatOllama) -> dict:
+def _finalize_node(state: TicketState, llm: BaseChatModel) -> dict:
     messages = state["messages"]
 
     category = None
@@ -158,7 +158,7 @@ def _finalize_node(state: TicketState, llm: ChatOllama) -> dict:
     }
 
 
-def build_graph(llm: ChatOllama | None = None, compose_llm: ChatOllama | None = None):
+def build_graph(llm: BaseChatModel | None = None, compose_llm: BaseChatModel | None = None):
     """LangGraph agent grafiğini oluşturur ve derler.
 
     `llm` tool-calling döngüsünde kullanılır; `compose_llm` son kullanıcıya

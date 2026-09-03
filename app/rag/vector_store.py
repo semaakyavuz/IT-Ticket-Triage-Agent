@@ -1,17 +1,11 @@
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
-from langchain_ollama import OllamaEmbeddings
 
-from app.config import CHROMA_PERSIST_DIR, OLLAMA_BASE_URL, OLLAMA_EMBED_MODEL
+from app.config import CHROMA_PERSIST_DIR
 from app.db.database import fetch_all_tickets
-
-COLLECTION_NAME = "tickets"
+from app.providers import collection_name, get_embeddings
 
 _default_store: Chroma | None = None
-
-
-def get_embeddings() -> OllamaEmbeddings:
-    return OllamaEmbeddings(model=OLLAMA_EMBED_MODEL, base_url=OLLAMA_BASE_URL)
 
 
 def get_vector_store(
@@ -19,9 +13,13 @@ def get_vector_store(
 ) -> Chroma:
     embeddings = embeddings or get_embeddings()
     return Chroma(
-        collection_name=COLLECTION_NAME,
+        collection_name=collection_name(),
         embedding_function=embeddings,
         persist_directory=persist_directory,
+        # Cosine: vektör normundan bağımsız, sağlayıcılar arasında tutarlı 0-2 aralığı.
+        # Chroma'nın varsayılanı L2 idi; normalize edilmemiş embedding'lerde (fastembed)
+        # mesafeler 5-17'ye çıkıp güven/benzerlik yüzdesini anlamsızlaştırıyordu.
+        collection_metadata={"hnsw:space": "cosine"},
     )
 
 
