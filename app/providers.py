@@ -1,19 +1,14 @@
-"""LLM ve embedding sağlayıcı fabrikaları.
+"""LLM ve embedding sağlayıcı seçimi — "modeli kim sağlıyor?" sorusunun tek yeri.
 
-Local geliştirmede Ollama (varsayılan; API key gerekmez, her şey makinede
-çalışır). Canlı demoda LLM için Groq'un ücretsiz API'si, embedding için ya
-sunucu içinde CPU'da çalışan fastembed (ONNX, ~350 MB RAM) ya da RAM harcamayan
-Google Gemini embedding API'si (ücretsiz katman; 512 MB'lık ücretsiz sunucular
-için tercih edilen).
+  LLM_PROVIDER       = ollama (local, key gerekmez) | groq   (canlı demo, ücretsiz)
+  EMBEDDING_PROVIDER = ollama (local, key gerekmez) | gemini (canlı demo, ücretsiz)
 
-Seçim tamamen ortam değişkenleriyle yapılır (LLM_PROVIDER, EMBEDDING_PROVIDER);
-agent/RAG kodu hangi sağlayıcının kullanıldığını bilmez. Sağlayıcı paketleri
-fonksiyon içinde import edilir ki kullanılmayan sağlayıcının bağımlılığı
-(ör. testlerde fastembed modeli) yüklenmek zorunda kalmasın.
+Agent ve RAG kodu hangi sağlayıcının kullanıldığını bilmez. Sağlayıcı paketleri
+fonksiyon içinde import edilir; kullanılmayan sağlayıcı yüklenmez.
 
-Seed ticket'ların embedding'leri `app/rag/embedding_cache/<model>.json` içinde
-repoya önbelleklenir (scripts/cache_seed_embeddings.py): sunucu her uyanışında
-index'i API'ye hiç gitmeden kurar, sadece kullanıcı sorguları embed edilir.
+Seed ticket'ların embedding'leri `app/rag/embedding_cache/<koleksiyon>.json`
+içinde repoya önbelleklenir (scripts/cache_seed_embeddings.py): sunucu her
+açılışta index'i API'ye gitmeden kurar, API'ye sadece kullanıcı sorguları gider.
 """
 
 import hashlib
@@ -28,6 +23,9 @@ from langchain_core.language_models import BaseChatModel
 from app import config
 
 EMBEDDING_CACHE_DIR = Path(__file__).resolve().parent / "rag" / "embedding_cache"
+
+
+# --- LLM -----------------------------------------------------------------------
 
 
 def get_chat_model(temperature: float = 0) -> BaseChatModel:
@@ -57,26 +55,14 @@ def get_chat_model(temperature: float = 0) -> BaseChatModel:
     raise ValueError(f"Bilinmeyen LLM_PROVIDER: {config.LLM_PROVIDER!r} (beklenen: ollama | groq)")
 
 
-class FastEmbedEmbeddings(Embeddings):
-    """fastembed'i LangChain'in Embeddings arayüzüne saran ince bir katman."""
-
-    def __init__(self, model_name: str, cache_dir: str):
-        from fastembed import TextEmbedding
-
-        self._model = TextEmbedding(model_name=model_name, cache_dir=cache_dir)
-
-    def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        return [vector.tolist() for vector in self._model.embed(texts)]
-
-    def embed_query(self, text: str) -> list[float]:
-        return next(iter(self._model.query_embed(text))).tolist()
+# --- Embedding -----------------------------------------------------------------
 
 
 class GeminiEmbeddings(Embeddings):
     """Google Gemini embedding REST API; ek SDK bağımlılığı yok (httpx zaten var).
 
     Belge/sorgu için farklı task type kullanılır (RETRIEVAL_DOCUMENT / RETRIEVAL_QUERY),
-    boyut `output_dimensionality` ile küçültülür. Vektörler normalize değildir;
+    boyut `outputDimensionality` ile küçültülür. Vektörler normalize değildir;
     Chroma koleksiyonu cosine kullandığı için sorun olmaz.
     """
 
@@ -89,9 +75,8 @@ class GeminiEmbeddings(Embeddings):
         self._model = model
         self._dimensions = dimensions
         # Key URL'de değil header'da: loglara/URL geçmişine sızmasın.
-        self._client = client or httpx.Client(timeout=30, headers={"x-goog-api-key": api_key})
-        if client is not None:
-            self._client.headers["x-goog-api-key"] = api_key
+        self._client = client or httpx.Client(timeout=30)
+        self._client.headers["x-goog-api-key"] = api_key
 
     def _post(self, method: str, body: dict) -> dict:
         response = self._client.post(f"{self.BASE_URL}/{self._model}:{method}", json=body)
@@ -172,9 +157,6 @@ class CachedEmbeddings(Embeddings):
 
 
 def _raw_embeddings() -> Embeddings:
-    if config.EMBEDDING_PROVIDER == "fastembed":
-        return FastEmbedEmbeddings(config.FASTEMBED_MODEL, config.FASTEMBED_CACHE_DIR)
-
     if config.EMBEDDING_PROVIDER == "gemini":
         return GeminiEmbeddings(config.GEMINI_API_KEY, config.GEMINI_EMBED_MODEL, config.GEMINI_EMBED_DIM)
 
@@ -184,12 +166,8 @@ def _raw_embeddings() -> Embeddings:
         return OllamaEmbeddings(model=config.OLLAMA_EMBED_MODEL, base_url=config.OLLAMA_BASE_URL)
 
     raise ValueError(
-        f"Bilinmeyen EMBEDDING_PROVIDER: {config.EMBEDDING_PROVIDER!r} (beklenen: ollama | fastembed | gemini)"
+        f"Bilinmeyen EMBEDDING_PROVIDER: {config.EMBEDDING_PROVIDER!r} (beklenen: ollama | gemini)"
     )
-
-
-def embedding_cache_path() -> Path:
-    return EMBEDDING_CACHE_DIR / f"{collection_name()}.json"
 
 
 def get_embeddings() -> Embeddings:
@@ -197,9 +175,14 @@ def get_embeddings() -> Embeddings:
     return CachedEmbeddings(_raw_embeddings(), embedding_cache_path())
 
 
+def embedding_cache_path() -> Path:
+    return EMBEDDING_CACHE_DIR / f"{collection_name()}.json"
+
+
+# --- Adlandırma / bilgi --------------------------------------------------------
+
+
 def embedding_model_name() -> str:
-    if config.EMBEDDING_PROVIDER == "fastembed":
-        return config.FASTEMBED_MODEL
     if config.EMBEDDING_PROVIDER == "gemini":
         return f"{config.GEMINI_EMBED_MODEL}-{config.GEMINI_EMBED_DIM}d"
     return config.OLLAMA_EMBED_MODEL
@@ -214,15 +197,12 @@ def llm_model_name() -> str:
 def collection_name() -> str:
     """Embedding modeline göre ayrı Chroma koleksiyonu.
 
-    Farklı modeller farklı boyutta vektör üretir; aynı koleksiyona yazmak
-    boyut uyuşmazlığı hatasıyla sonuçlanır. Sağlayıcı/model değiştiğinde
-    koleksiyon adı da değiştiği için eski index sessizce devre dışı kalır ve
-    yeniden indexleme gerekir (scripts/index_tickets.py veya açılışta otomatik).
+    Farklı modeller farklı boyutta vektör üretir; aynı koleksiyona yazmak boyut
+    uyuşmazlığıyla sonuçlanır. Model değişince ad da değişir; yeni koleksiyon
+    açılışta otomatik kurulur.
     """
-    model_slug = embedding_model_name().split("/")[-1]
-    raw = f"tickets_{config.EMBEDDING_PROVIDER}_{model_slug}"
-    safe = re.sub(r"[^A-Za-z0-9_-]", "_", raw)[:63]
-    return safe.rstrip("_-")
+    raw = f"tickets_{config.EMBEDDING_PROVIDER}_{embedding_model_name().split('/')[-1]}"
+    return re.sub(r"[^A-Za-z0-9_-]", "_", raw)[:63].rstrip("_-")
 
 
 def describe_providers() -> dict:

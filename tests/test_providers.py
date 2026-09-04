@@ -4,14 +4,12 @@ from app import config, providers
 
 
 def test_collection_name_is_chroma_safe_and_provider_specific(monkeypatch):
-    monkeypatch.setattr(config, "EMBEDDING_PROVIDER", "fastembed")
-    monkeypatch.setattr(
-        config, "FASTEMBED_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    )
+    monkeypatch.setattr(config, "EMBEDDING_PROVIDER", "ollama")
+    monkeypatch.setattr(config, "OLLAMA_EMBED_MODEL", "nomic-embed-text:v1.5")
 
     name = providers.collection_name()
 
-    assert name == "tickets_fastembed_paraphrase-multilingual-MiniLM-L12-v2"
+    assert name == "tickets_ollama_nomic-embed-text_v1_5"  # ':' ve '.' Chroma icin guvenli degil
     assert 3 <= len(name) <= 63
 
 
@@ -20,10 +18,10 @@ def test_collection_name_changes_with_embedding_model(monkeypatch):
     monkeypatch.setattr(config, "OLLAMA_EMBED_MODEL", "nomic-embed-text")
     ollama_name = providers.collection_name()
 
-    monkeypatch.setattr(config, "EMBEDDING_PROVIDER", "fastembed")
-    fastembed_name = providers.collection_name()
+    monkeypatch.setattr(config, "EMBEDDING_PROVIDER", "gemini")
+    gemini_name = providers.collection_name()
 
-    assert ollama_name != fastembed_name
+    assert ollama_name != gemini_name
 
 
 def test_describe_providers_has_no_secrets(monkeypatch):

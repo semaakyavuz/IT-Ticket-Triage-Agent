@@ -19,12 +19,10 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 # Canli demo varsayilanlari. Hosting panelinden (Render: Environment) ezilebilir;
 # GROQ_API_KEY imaja GOMULMEZ, panelde gizli degisken olarak tanimlanir.
-# Embedding: Gemini API (RAM harcamaz). Sunucu ici fastembed 512 MB'lik ucretsiz
-# sunucuda OOM verdigi icin (olculdu: exit 137) canli demoda kullanilmiyor;
-# EMBEDDING_PROVIDER=fastembed ile hala secilebilir (model ilk acilista iner).
+# Embedding Gemini API'den gelir (RAM harcamaz): 512 MB'lik ucretsiz sunucuda
+# sunucu ici bir modelin OOM verdigi olculmustu.
 ENV LLM_PROVIDER=groq \
     EMBEDDING_PROVIDER=gemini \
-    FASTEMBED_CACHE_DIR=/home/user/app/models \
     SQLITE_DB_PATH=/home/user/app/data/tickets.db \
     CHROMA_PERSIST_DIR=/home/user/app/data/chroma \
     AUTO_INDEX=true \

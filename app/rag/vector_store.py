@@ -24,8 +24,8 @@ def get_vector_store(
         embedding_function=embeddings,
         persist_directory=persist_directory,
         # Cosine: vektör normundan bağımsız, sağlayıcılar arasında tutarlı 0-2 aralığı.
-        # Chroma'nın varsayılanı L2 idi; normalize edilmemiş embedding'lerde (fastembed)
-        # mesafeler 5-17'ye çıkıp güven/benzerlik yüzdesini anlamsızlaştırıyordu.
+        # Chroma'nın varsayılanı L2 idi; normalize edilmemiş embedding'lerde mesafeler
+        # 5-17'ye çıkıp güven/benzerlik yüzdesini anlamsızlaştırıyordu.
         collection_metadata={"hnsw:space": "cosine"},
     )
 
