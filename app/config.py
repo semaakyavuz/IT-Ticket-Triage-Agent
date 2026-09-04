@@ -26,10 +26,18 @@ GROQ_REASONING_EFFORT = os.getenv("GROQ_REASONING_EFFORT", "none")
 GROQ_MAX_TOKENS = int(os.getenv("GROQ_MAX_TOKENS", "256"))
 
 # Türkçe metin için çok dilli, sunucu içinde (ONNX, CPU) çalışan hafif bir model.
+# Not: ~350 MB RAM ister; 512 MB'lık ücretsiz sunucularda (Render) OOM verir.
 FASTEMBED_MODEL = os.getenv(
     "FASTEMBED_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 )
 FASTEMBED_CACHE_DIR = os.getenv("FASTEMBED_CACHE_DIR", "./data/fastembed")
+
+# Google Gemini embedding API (ücretsiz katman, kart gerekmez): RAM harcamaz,
+# 512 MB'lık ücretsiz sunucuda çalışan canlı demo için tercih edilen seçenek.
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
+# 3072 varsayılanı gereksiz büyük; 768 hem kaliteli hem küçük (önbellek dosyası + Chroma).
+GEMINI_EMBED_DIM = int(os.getenv("GEMINI_EMBED_DIM", "768"))
 
 SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", "./data/tickets.db")
 CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./data/chroma")

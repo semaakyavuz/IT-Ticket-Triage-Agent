@@ -50,8 +50,13 @@ def ensure_index(vector_store: Chroma | None = None, tickets: list[dict] | None 
     return index_tickets(vector_store, tickets)
 
 
+def ticket_text(ticket: dict) -> str:
+    """Embed edilen metin; önbellek anahtarı da bu metnin hash'i (bkz. providers.CachedEmbeddings)."""
+    return f"{ticket['title']}\n{ticket['description']}"
+
+
 def _ticket_to_document(ticket: dict) -> Document:
-    content = f"{ticket['title']}\n{ticket['description']}"
+    content = ticket_text(ticket)
     metadata = {
         "ticket_id": ticket["id"],
         "category": ticket["category"],

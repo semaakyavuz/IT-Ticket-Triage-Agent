@@ -1,0 +1,25 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Render Dashboard > New > Blueprint > bu repo'yu sec. Servis ucretsiz planda,
+# Dockerfile ile kurulur. sync: false olan degiskenler (API key'ler) panelden
+# elle girilir, repoya yazilmaz.
+services:
+  - type: web
+    name: it-ticket-triage-agent
+    runtime: docker
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: groq
+      - key: EMBEDDING_PROVIDER
+        value: gemini
+      - key: DEMO_SEED_HISTORY
+        value: "true"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "10"
