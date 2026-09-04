@@ -15,7 +15,15 @@ OLLAMA_CHAT_MODEL = os.getenv("OLLAMA_CHAT_MODEL", "llama3.2")
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# Ücretsiz katmanda Llama 3.x yok (2026); tool-calling'i en tutarlı uygulayan ve
+# Türkçe'de güçlü açık model olarak Qwen seçildi (gpt-oss-120b RAG adımını atlıyordu).
+GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
+# Qwen'in "düşünme" token'ları gecikmeyi 30 sn'ye çıkarabiliyor; "none" kapatır.
+# Boş bırakılırsa parametre gönderilmez (reasoning desteklemeyen modeller için).
+GROQ_REASONING_EFFORT = os.getenv("GROQ_REASONING_EFFORT", "none")
+# Ücretsiz katman dakikada ~1000 çıktı token'ı verir ve her istekte max_tokens
+# kadar rezerve eder; tool çağrısı + tek cümle için 256 fazlasıyla yeterli.
+GROQ_MAX_TOKENS = int(os.getenv("GROQ_MAX_TOKENS", "256"))
 
 # Türkçe metin için çok dilli, sunucu içinde (ONNX, CPU) çalışan hafif bir model.
 FASTEMBED_MODEL = os.getenv(

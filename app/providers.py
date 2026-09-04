@@ -24,7 +24,16 @@ def get_chat_model(temperature: float = 0) -> BaseChatModel:
 
         if not config.GROQ_API_KEY:
             raise RuntimeError("LLM_PROVIDER=groq için GROQ_API_KEY ortam değişkeni tanımlı olmalı")
-        return ChatGroq(model=config.GROQ_MODEL, api_key=config.GROQ_API_KEY, temperature=temperature)
+        extra = {}
+        if config.GROQ_REASONING_EFFORT:
+            extra["reasoning_effort"] = config.GROQ_REASONING_EFFORT
+        return ChatGroq(
+            model=config.GROQ_MODEL,
+            api_key=config.GROQ_API_KEY,
+            temperature=temperature,
+            max_tokens=config.GROQ_MAX_TOKENS,
+            **extra,
+        )
 
     if config.LLM_PROVIDER == "ollama":
         from langchain_ollama import ChatOllama

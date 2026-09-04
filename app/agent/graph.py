@@ -18,8 +18,9 @@ IT sorununu incelemek için şu adımları SIRAYLA uygula:
 1. Sorunu şu 4 kategoriden birine ata: {", ".join(CATEGORIES)}.
 2. `get_priority` tool'unu, belirlediğin kategori ve ticket metniyle çağırarak önceliği
    belirle (olası değerler: {", ".join(PRIORITIES)}).
-3. `search_similar_tickets` tool'unu ticket metniyle çağırarak geçmişte benzer bir
-   ticket olup olmadığına bak.
+3. `search_similar_tickets` tool'unu ticket metniyle MUTLAKA çağır (her ticket için,
+   istisnasız; sorun "bariz" görünse bile) ve geçmişte benzer bir ticket olup
+   olmadığına bak.
 4. Benzer ve alakalı bir ticket bulunduysa, onun çözümüne dayanarak kısa bir çözüm
    öner. Yeterince benzer bir ticket bulunamadıysa `assign_team` tool'unu belirlediğin
    kategoriyle çağırarak doğru ekibe yönlendir.
@@ -35,8 +36,8 @@ kullanıcıya gösterilmeyecek, sadece adımların tamamlandığını belirtir).
 # İngilizce/liste formatlı yanıtla sonuçlanabiliyordu); tek amaçlı, kısa bir prompt
 # bu modelde belirgin şekilde daha tutarlı sonuç verdi.
 COMPOSE_PROMPT_TEMPLATE = """Sen bir IT destek asistanısın. Aşağıdaki bilgilere dayanarak
-kullanıcıya söyleyeceğin TEK bir Türkçe cümle yaz. SADECE o cümleyi yaz; liste,
-madde işareti, başlık veya ek açıklama KULLANMA.
+kullanıcıya söyleyeceğin TEK bir Türkçe cümle yaz (EN FAZLA 25 kelime). SADECE o
+cümleyi yaz; liste, madde işareti, başlık veya ek açıklama KULLANMA.
 
 Kategori: {category}
 Öncelik: {priority}
@@ -145,6 +146,11 @@ def _finalize_node(state: TicketState, llm: BaseChatModel) -> dict:
     except json.JSONDecodeError:
         similar_tickets = []
 
+    # Benzer ticket bulunduğunda agent assign_team'i çağırmaz (çözüm önerir);
+    # yine de geçmiş/dashboard için ilgili ekip bilinsin: en benzer ticket'ı çözen ekip.
+    if assigned_team is None and similar_tickets:
+        assigned_team = similar_tickets[0].get("team")
+
     confidence = _estimate_confidence(similar_tickets)
     solution = _compose_solution_text(llm, category, priority, similar_tickets, assigned_team)
 
@@ -156,6 +162,29 @@ def _finalize_node(state: TicketState, llm: BaseChatModel) -> dict:
         "solution": solution,
         "assigned_team": assigned_team,
     }
+
+
+def _after_tools(state: TicketState) -> str:
+    """Tool sonuçlarından sonra: plan tamamlandıysa agent'a dönmeden finalize'a geç.
+
+    Aksi halde agent bir tur daha çağrılıp sadece "tamamlandı" der; bu tur hem
+    gecikme hem de (Groq ücretsiz katmanında dakikada ~1000 olan) çıktı token
+    kotasını harcar. Plan: öncelik + benzer ticket araması yapılmış ve ya benzer
+    ticket bulunmuş ya da ekip atanmış olmalı.
+    """
+    messages = state["messages"]
+    have_priority = _extract_tool_result(messages, "get_priority") is not None
+    similar_raw = _extract_tool_result(messages, "search_similar_tickets")
+    have_team = _extract_tool_result(messages, "assign_team") is not None
+
+    if have_priority and similar_raw is not None:
+        try:
+            found_similar = bool(json.loads(similar_raw))
+        except json.JSONDecodeError:
+            found_similar = False
+        if found_similar or have_team:
+            return "finalize"
+    return "agent"
 
 
 def build_graph(llm: BaseChatModel | None = None, compose_llm: BaseChatModel | None = None):
@@ -179,7 +208,9 @@ def build_graph(llm: BaseChatModel | None = None, compose_llm: BaseChatModel | N
     graph.add_conditional_edges(
         "agent", tools_condition, {"tools": "tools", END: "finalize"}
     )
-    graph.add_edge("tools", "agent")
+    graph.add_conditional_edges(
+        "tools", _after_tools, {"agent": "agent", "finalize": "finalize"}
+    )
     graph.add_edge("finalize", END)
 
     return graph.compile()

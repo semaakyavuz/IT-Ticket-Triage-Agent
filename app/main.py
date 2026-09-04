@@ -104,9 +104,18 @@ def triage_ticket(
 ) -> TicketResponse:
     try:
         result = graph.invoke({"ticket_text": payload.text, "messages": []})
-    except Exception:
-        # Harici sağlayıcı (Groq kotası, Ollama kapalı, ağ) hatası: 500 + traceback
-        # yerine kullanıcıya anlaşılır, tekrar denenebilir bir mesaj.
+    except Exception as exc:
+        # Harici sağlayıcı hatası: 500 + traceback yerine kullanıcıya anlaşılır,
+        # tekrar denenebilir bir mesaj. Sağlayıcının 429'u (ücretsiz katman dakikalık
+        # token kotası) ayrıca ve dürüstçe bildirilir.
+        if getattr(exc, "status_code", None) == 429:
+            logger.warning("LLM sağlayıcısı kota sınırı (429): %s", exc)
+            raise HTTPException(
+                status_code=429,
+                detail="Ücretsiz LLM kotası bir dakikalığına doldu. Lütfen 30-60 saniye sonra "
+                "tekrar deneyin.",
+                headers={"Retry-After": "30"},
+            )
         logger.exception("Agent çalışırken hata oluştu")
         raise HTTPException(
             status_code=503,

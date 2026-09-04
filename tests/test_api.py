@@ -171,6 +171,26 @@ def test_triage_ticket_returns_503_when_agent_fails(make_client):
     assert client.get("/tickets/history").json() == []
 
 
+def test_triage_ticket_maps_provider_rate_limit_to_429(make_client):
+    from app.main import app, get_agent_graph
+
+    class QuotaError(Exception):
+        status_code = 429  # groq/openai SDK'larinin RateLimitError'u gibi
+
+    class ThrottledGraph:
+        def invoke(self, state):
+            raise QuotaError("Rate limit reached ... output tokens per minute")
+
+    client = make_client(FAKE_RESULT)
+    app.dependency_overrides[get_agent_graph] = lambda: ThrottledGraph()
+
+    response = client.post("/ticket", json={"text": "VPN kopuyor"})
+
+    assert response.status_code == 429
+    assert "kota" in response.json()["detail"].lower()
+    assert response.headers["Retry-After"] == "30"
+
+
 def test_triage_ticket_returns_503_when_provider_misconfigured(make_client, monkeypatch):
     from app import config
     from app import main as main_module
